@@ -11,16 +11,21 @@ import numpy as np
 
 
 
+use_gpu = False
 
 def netInit():
 
     torch.backends.cudnn.benchmark = True
     cls_num_per_lane = 18
-    net = parsingNet(pretrained = False, backbone='18',cls_dim = (200+1,cls_num_per_lane,4),
-                        use_aux=False).cpu()
-
     modlePath = 'culane_18.pth'
-    state_dict = torch.load(modlePath, map_location = 'cpu')['model']
+    if use_gpu == True:
+        net = parsingNet(pretrained = False, backbone='18',cls_dim = (200+1,cls_num_per_lane,4),
+                            use_aux=False).cuda()
+        state_dict = torch.load(modlePath, map_location = 'cuda')['model']
+    else:
+        net = parsingNet(pretrained = False, backbone='18',cls_dim = (200+1,cls_num_per_lane,4),
+                            use_aux=False).cpu()
+        state_dict = torch.load(modlePath, map_location = 'cpu')['model']
 
     net.load_state_dict(state_dict, strict = False)
     net.eval()
@@ -33,14 +38,18 @@ def img_trans(input_img):
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])    
     img = img_transforms(input_img)
-    img = img.cpu() 
-    img = img.unsqueeze(0).cpu()+1
+    if use_gpu == True:
+        img = img.cuda() 
+        img = img.unsqueeze(0).cuda()+1
+    else:
+        img = img.cpu() 
+        img = img.unsqueeze(0).cpu()+1
     return img
 
 net = netInit()
 
 # somedir = 'C:\\Users\\wp\\Downloads\\driver_37_30frame.tar\\driver_37_30frame\\05181520_0219.MP4'
-somedir = 'C:\\Users\\wp\\Downloads\\mycamcap'
+somedir = os.getcwd()
 files = [f for f in os.listdir(somedir) 
     if os.path.isfile(os.path.join(somedir, f)) 
     and f.endswith(".jpg")]
@@ -51,7 +60,7 @@ col_sample_w = col_sample[1] - col_sample[0]
 row_anchor = [121, 131, 141, 150, 160, 170, 180, 189, 199, 209, 219, 228, 238, 248, 258, 267, 277, 287]
 cls_num_per_lane = 18
 
-results_path = 'C:\\Users\\wp\\Downloads\\lane_test_results'
+results_path = somedir
 
 with torch.no_grad():
     for f in files:
@@ -86,7 +95,7 @@ with torch.no_grad():
                         ppp = (int(out_j[k, i] * col_sample_w * img_w / 800) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/288)) - 1 )
                         cv2.circle(vis,ppp,5,(0,255,0),-1)
         
-        filename = os.path.join(results_path, f)
+        filename = os.path.join(results_path, 're_'+f)
         cv2.imwrite(filename, vis)
 
 
